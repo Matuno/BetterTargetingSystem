@@ -65,10 +65,14 @@ public unsafe class Utils
 
         var dir = obj.Position - Plugin.ObjectTable.LocalPlayer.Position;
         var dirVec = new Vector2(dir.Z, dir.X);
+        var dirAngle = Math.Atan2(dirVec.Y, dirVec.X);
+        var faceAngle = Math.Atan2(faceVec.Y, faceVec.X);
+        
         var angle = Math.Acos(Vector2.Dot(dirVec, faceVec) / dirVec.Length() / faceVec.Length());
         bool inFront = angle <= Math.PI * maxAngle / 360;
         
-        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | Angle: {angle:F3} rad | InFront: {inFront}");
+        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | PlayerPos: {Plugin.ObjectTable.LocalPlayer.Position} | TargetPos: {obj.Position}");
+        Plugin.PluginLog.Debug($"[BTS] DirAngle: {dirAngle:F3} | FaceAngle: {faceAngle:F3} | Diff: {angle:F3} | InFront: {inFront}");
         return inFront;
     }
 
