@@ -66,7 +66,10 @@ public unsafe class Utils
         var dir = obj.Position - Plugin.ObjectTable.LocalPlayer.Position;
         var dirVec = new Vector2(dir.Z, dir.X);
         var angle = Math.Acos(Vector2.Dot(dirVec, faceVec) / dirVec.Length() / faceVec.Length());
-        return angle <= Math.PI * maxAngle / 360;
+        bool inFront = angle <= Math.PI * maxAngle / 360;
+        
+        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | Angle: {angle:F3} rad | InFront: {inFront}");
+        return inFront;
     }
 
     internal static bool IsInLineOfSight(GameObject* target, bool useCamera = false)
