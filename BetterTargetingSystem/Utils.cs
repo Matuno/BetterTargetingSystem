@@ -54,28 +54,26 @@ public unsafe class Utils
         return (float)Math.Atan2(matrix.M31, matrix.M33);
     }
 
-    internal static bool IsInFrontOfCamera(DalamudGameObject obj, float maxAngle)
+    internal unsafe static bool IsInFrontOfCamera(DalamudGameObject obj, float maxAngle)
     {
-        // This is still relying on camera orientation but the cone is from the player's position
-        if (Plugin.ObjectTable.LocalPlayer == null)
+        var cameraManager = CameraManager.Instance();
+        if (cameraManager == null || cameraManager->CurrentCamera == null || Plugin.ObjectTable.LocalPlayer == null)
             return false;
 
-        var rotation = GetCameraRotation();
+        var matrix = cameraManager->CurrentCamera->ViewMatrix;
+        var p = obj.Position;
         
-        // FFXIV standard: South is 0, North is PI, West is PI/2, East is -PI/2
-        // We use X and Z directly to calculate the angle to the target
-        var dir = obj.Position - Plugin.ObjectTable.LocalPlayer.Position;
-        var angleToTarget = Math.Atan2(-dir.X, dir.Z); 
+        // Transform world position to camera-space position
+        float camX = matrix.M11 * p.X + matrix.M21 * p.Y + matrix.M31 * p.Z + matrix.M41;
+        float camY = matrix.M12 * p.X + matrix.M22 * p.Y + matrix.M32 * p.Z + matrix.M42;
+        float camZ = matrix.M13 * p.X + matrix.M23 * p.Y + matrix.M33 * p.Z + matrix.M43;
         
-        // Normalize difference
-        var diff = rotation - angleToTarget;
-        while (diff > Math.PI) diff -= 2 * Math.PI;
-        while (diff < -Math.PI) diff += 2 * Math.PI;
-        
-        var angle = Math.Abs(diff);
+        // In FFXIV camera-space, the camera looks towards negative Z
+        // Horizontal angle is atan2(X, -Z)
+        var angle = Math.Abs(Math.Atan2(camX, -camZ));
         bool inFront = angle <= Math.PI * maxAngle / 360;
-        
-        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | CamRot: {rotation:F3} | TargetAngle: {angleToTarget:F3} | Diff: {angle:F3} | InFront: {inFront}");
+
+        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | CamSpace: X={camX:F2}, Z={camZ:F2} | Angle: {angle:F3} | InFront: {inFront}");
         return inFront;
     }
 
