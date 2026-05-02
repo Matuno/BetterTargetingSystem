@@ -39,19 +39,12 @@ public unsafe class Utils
 
     internal unsafe static float GetCameraRotation()
     {
-        // Gives the camera rotation in deg between -180 and 180
-        var cameraRotation = AreaMapNumberArray.Instance()->ConeRotation;
+        var cameraManager = CameraManager.Instance();
+        if (cameraManager == null || cameraManager->CurrentCamera == null)
+            return 0;
 
-        // Restore the +135 offset from previous versions
-        cameraRotation += 135;
-
-        // Transform the [-180,180] rotation to rad with same 0 as a GameObject rotation
-        // There might be an easier way to do that, but geometry and I aren't friends
-        var sign = Math.Sign(cameraRotation) == -1 ? -1 : 1;
-        var rotation = (float)((Math.Abs(cameraRotation * (Math.PI / 180)) - Math.PI) * sign);
-
-        Plugin.PluginLog.Debug($"[BTS] Final Rotation: {rotation}");
-        return rotation;
+        // CurrentCamera->Object is a GameObject, and its Rotation is already in the correct radians
+        return cameraManager->CurrentCamera->Object.Rotation;
     }
 
     internal static bool IsInFrontOfCamera(DalamudGameObject obj, float maxAngle)
@@ -61,18 +54,21 @@ public unsafe class Utils
             return false;
 
         var rotation = GetCameraRotation();
-        var faceVec = new Vector2((float)Math.Cos(rotation), (float)Math.Sin(rotation));
-
-        var dir = obj.Position - Plugin.ObjectTable.LocalPlayer.Position;
-        var dirVec = new Vector2(dir.Z, dir.X);
-        var dirAngle = Math.Atan2(dirVec.Y, dirVec.X);
-        var faceAngle = Math.Atan2(faceVec.Y, faceVec.X);
         
-        var angle = Math.Acos(Vector2.Dot(dirVec, faceVec) / dirVec.Length() / faceVec.Length());
+        // FFXIV standard: South is 0, North is PI, West is PI/2, East is -PI/2
+        // We use X and Z directly to calculate the angle to the target
+        var dir = obj.Position - Plugin.ObjectTable.LocalPlayer.Position;
+        var angleToTarget = Math.Atan2(-dir.X, dir.Z); 
+        
+        // Normalize difference
+        var diff = rotation - angleToTarget;
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+        
+        var angle = Math.Abs(diff);
         bool inFront = angle <= Math.PI * maxAngle / 360;
         
-        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | PlayerPos: {Plugin.ObjectTable.LocalPlayer.Position} | TargetPos: {obj.Position}");
-        Plugin.PluginLog.Debug($"[BTS] DirAngle: {dirAngle:F3} | FaceAngle: {faceAngle:F3} | Diff: {angle:F3} | InFront: {inFront}");
+        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | CamRot: {rotation:F3} | TargetAngle: {angleToTarget:F3} | Diff: {angle:F3} | InFront: {inFront}");
         return inFront;
     }
 
