@@ -39,6 +39,17 @@ public unsafe class Utils
 
 
 
+    internal unsafe static float GetCameraRotation()
+    {
+        var cameraManager = CameraManager.Instance();
+        if (cameraManager == null || cameraManager->CurrentCamera == null)
+            return 0;
+
+        // Extract horizontal rotation from ViewMatrix
+        var matrix = cameraManager->CurrentCamera->ViewMatrix;
+        return (float)Math.Atan2(matrix.M31, matrix.M33);
+    }
+
     internal unsafe static bool IsInFrontOfCamera(DalamudGameObject obj, float maxAngle)
     {
         var cameraManager = CameraManager.Instance();
@@ -48,12 +59,11 @@ public unsafe class Utils
         var matrix = cameraManager->CurrentCamera->ViewMatrix;
         var p = obj.Position;
         
-        // Transform world position to camera-space position
+        // Transform world position to camera-space position (Projection)
         float camX = matrix.M11 * p.X + matrix.M21 * p.Y + matrix.M31 * p.Z + matrix.M41;
         float camZ = matrix.M13 * p.X + matrix.M23 * p.Y + matrix.M33 * p.Z + matrix.M43;
         
-        // In FFXIV camera-space, the camera looks towards negative Z
-        // Horizontal angle is atan2(X, -Z)
+        // Horizontal angle in camera-space: atan2(X, -Z)
         var angle = Math.Abs(Math.Atan2(camX, -camZ));
         return angle <= Math.PI * maxAngle / 360;
     }
