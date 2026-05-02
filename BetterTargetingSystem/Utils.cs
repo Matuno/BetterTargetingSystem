@@ -37,22 +37,7 @@ public unsafe class Utils
         return distance;
     }
 
-    internal unsafe static float GetCameraRotation()
-    {
-        var cameraManager = CameraManager.Instance();
-        if (cameraManager == null || cameraManager->CurrentCamera == null)
-            return 0;
 
-        // ViewMatrix is a 4x4 matrix. The forward vector is usually in the 3rd row or column.
-        // In FFXIV, the ViewMatrix seems to be row-major.
-        var matrix = cameraManager->CurrentCamera->ViewMatrix;
-        
-        // The forward vector (where the camera is looking) is the negation of the 3rd row/column for a standard ViewMatrix
-        // Let's log the matrix to be sure
-        Plugin.PluginLog.Debug($"[BTS] Matrix: M31={matrix.M31:F3}, M32={matrix.M32:F3}, M33={matrix.M33:F3}");
-        
-        return (float)Math.Atan2(matrix.M31, matrix.M33);
-    }
 
     internal unsafe static bool IsInFrontOfCamera(DalamudGameObject obj, float maxAngle)
     {
@@ -65,16 +50,12 @@ public unsafe class Utils
         
         // Transform world position to camera-space position
         float camX = matrix.M11 * p.X + matrix.M21 * p.Y + matrix.M31 * p.Z + matrix.M41;
-        float camY = matrix.M12 * p.X + matrix.M22 * p.Y + matrix.M32 * p.Z + matrix.M42;
         float camZ = matrix.M13 * p.X + matrix.M23 * p.Y + matrix.M33 * p.Z + matrix.M43;
         
         // In FFXIV camera-space, the camera looks towards negative Z
         // Horizontal angle is atan2(X, -Z)
         var angle = Math.Abs(Math.Atan2(camX, -camZ));
-        bool inFront = angle <= Math.PI * maxAngle / 360;
-
-        Plugin.PluginLog.Debug($"[BTS] Target: {obj.Name} | CamSpace: X={camX:F2}, Z={camZ:F2} | Angle: {angle:F3} | InFront: {inFront}");
-        return inFront;
+        return angle <= Math.PI * maxAngle / 360;
     }
 
     internal static bool IsInLineOfSight(GameObject* target, bool useCamera = false)
