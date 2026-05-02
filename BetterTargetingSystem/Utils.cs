@@ -43,8 +43,15 @@ public unsafe class Utils
         if (cameraManager == null || cameraManager->CurrentCamera == null)
             return 0;
 
-        var lookAt = cameraManager->CurrentCamera->LookAtVector;
-        return (float)Math.Atan2(-lookAt.X, lookAt.Z);
+        // ViewMatrix is a 4x4 matrix. The forward vector is usually in the 3rd row or column.
+        // In FFXIV, the ViewMatrix seems to be row-major.
+        var matrix = cameraManager->CurrentCamera->ViewMatrix;
+        
+        // The forward vector (where the camera is looking) is the negation of the 3rd row/column for a standard ViewMatrix
+        // Let's log the matrix to be sure
+        Plugin.PluginLog.Debug($"[BTS] Matrix: M31={matrix.M31:F3}, M32={matrix.M32:F3}, M33={matrix.M33:F3}");
+        
+        return (float)Math.Atan2(matrix.M31, matrix.M33);
     }
 
     internal static bool IsInFrontOfCamera(DalamudGameObject obj, float maxAngle)
