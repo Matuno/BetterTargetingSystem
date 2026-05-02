@@ -43,8 +43,8 @@ public unsafe class Utils
         if (cameraManager == null || cameraManager->CurrentCamera == null)
             return 0;
 
-        // CurrentCamera->Object is a GameObject, and its Rotation is already in the correct radians
-        return cameraManager->CurrentCamera->Object.Rotation;
+        var lookAt = cameraManager->CurrentCamera->LookAtVector;
+        return (float)Math.Atan2(-lookAt.X, lookAt.Z);
     }
 
     internal static bool IsInFrontOfCamera(DalamudGameObject obj, float maxAngle)
