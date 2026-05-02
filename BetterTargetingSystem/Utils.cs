@@ -42,12 +42,15 @@ public unsafe class Utils
         // Gives the camera rotation in deg between -180 and 180
         var cameraRotation = AreaMapNumberArray.Instance()->ConeRotation;
 
+        // Restore the +135 offset from previous versions
+        cameraRotation += 135;
+
         // Transform the [-180,180] rotation to rad with same 0 as a GameObject rotation
         // There might be an easier way to do that, but geometry and I aren't friends
         var sign = Math.Sign(cameraRotation) == -1 ? -1 : 1;
         var rotation = (float)((Math.Abs(cameraRotation * (Math.PI / 180)) - Math.PI) * sign);
 
-        // DO NOT ASK WHY. +135
+        Plugin.PluginLog.Debug($"[BTS] Final Rotation: {rotation}");
         return rotation;
     }
 
