@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using Dalamud.Utility.Signatures;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI.Arrays;
+using Serilog;
 
 namespace BetterTargetingSystem;
 
@@ -34,6 +35,7 @@ public unsafe class Utils
         var distance = Vector3.Distance(sourcePos, targetPos);
         //distance -= source.HitboxRadius;
         distance -= targetHitboxRadius;
+        Plugin.Log($"Distance: {distance}");
         return distance;
     }
 
@@ -58,11 +60,11 @@ public unsafe class Utils
 
         var matrix = cameraManager->CurrentCamera->ViewMatrix;
         var p = obj.Position;
-        
+
         // Transform world position to camera-space position (Projection)
         float camX = matrix.M11 * p.X + matrix.M21 * p.Y + matrix.M31 * p.Z + matrix.M41;
         float camZ = matrix.M13 * p.X + matrix.M23 * p.Y + matrix.M33 * p.Z + matrix.M43;
-        
+
         // Horizontal angle in camera-space: atan2(X, -Z)
         var angle = Math.Abs(Math.Atan2(camX, -camZ));
         return angle <= Math.PI * maxAngle / 360;
@@ -75,7 +77,10 @@ public unsafe class Utils
 
         var framework = CSFramework.Instance();
         if (framework == null || framework->BGCollisionModule == null)
+        {
+            Plugin.Log("Framework is null. Returning false.");
             return false;
+        }
 
         var sourcePos = FFXIVClientStructs.FFXIV.Common.Math.Vector3.Zero;
         if (useCamera)
@@ -83,7 +88,10 @@ public unsafe class Utils
             // Using the camera's position as origin for raycast
             var cameraManager = CameraManager.Instance();
             if (cameraManager == null || cameraManager->CurrentCamera == null)
+            {
+                Plugin.Log("Camera is null. Returning false.");
                 return false;
+            }
 
             sourcePos = cameraManager->CurrentCamera->Object.Position;
         }
@@ -93,7 +101,10 @@ public unsafe class Utils
             if (Plugin.ObjectTable.LocalPlayer == null) return false;
             var player = (GameObject*)Plugin.ObjectTable.LocalPlayer.Address;
             if (player == null)
+            {
+                Plugin.Log("Player is null. Returning false.");
                 return false;
+            }
 
             sourcePos = player->Position;
             sourcePos.Y += 2;
@@ -113,7 +124,7 @@ public unsafe class Utils
         RaycastHit hit;
         var flags = stackalloc int[] { 0x4000, 0, 0x4000, 0 };
         var isLoSBlocked = framework->BGCollisionModule->RaycastMaterialFilter(&hit, &originVect, &directionVect, distance, 1, flags);
-
+        Plugin.Log($"LoS: {!isLoSBlocked}");
         return isLoSBlocked == false;
     }
 

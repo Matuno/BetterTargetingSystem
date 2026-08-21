@@ -15,8 +15,6 @@ The plugin will not target enemies you cannot interact with, such as those in an
 It also adds an extra keybind to target the lowest (absolute) health enemy as well as a keybind to target the "best" enemy for targeted aoes.
 You can use /bts to configure the keybinds used by this plugin as well as the angles and ranges of the cones and circle used to cycle between targets.
 
-**This plugin is disabled in PvP.**
-
 Do not hesitate to give feedback/suggestion and submit bug reports on the Github repository.
 
 \* Yes, TAB will now target those huge bosses without having to reorient the camera to get the center of their model in view  
