@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.UI.Arrays;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using NativeCharacter = FFXIVClientStructs.FFXIV.Client.Game.Character.Character;
 
 namespace BetterTargetingSystem;
 
@@ -34,6 +35,25 @@ public unsafe class Utils
             return false;
 
         return ActionManager.CanUseActionOnTarget(142, (GameObject*)obj.Address);
+    }
+
+    internal static bool IsHostilePlayer(DalamudGameObject obj)
+    {
+        if (obj.Address == nint.Zero
+            || obj is not Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter player)
+            return false;
+
+        var isPvP = Plugin.Client.IsPvP;
+        if (isPvP)
+        {
+            var classifiedAsEnemy = ActionManager.ClassifyTarget((NativeCharacter*)obj.Address)
+                                    == ActionManager.TargetCategory.Enemy;
+            return TargetSelectionPolicy.IsHostilePlayer(true, false, classifiedAsEnemy);
+        }
+
+        var publicHostileFlag = (player.StatusFlags
+                                 & Dalamud.Game.ClientState.Objects.Enums.StatusFlags.Hostile) != 0;
+        return TargetSelectionPolicy.IsHostilePlayer(false, publicHostileFlag, false);
     }
 
     internal static float DistanceBetweenObjects(DalamudGameObject source, DalamudGameObject target)

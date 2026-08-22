@@ -343,6 +343,21 @@ namespace BetterTargetingSystem.Windows
                 ImGui.EndTable();
             }
 
+            ImGui.Text("\n[PvP]");
+            var prioritizePlayersInPvP = Configuration.PrioritizePlayersInPvP;
+            if (ImGui.Checkbox("Prefer enemy players over battle NPCs##PrioritizePlayersInPvP", ref prioritizePlayersInPvP))
+            {
+                Configuration.PrioritizePlayersInPvP = prioritizePlayersInPvP;
+                Configuration.Save();
+            }
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(
+                    "When an eligible hostile player is visible for this PvP targeting command,\n"
+                    + "ignore battle-NPC targets (including objectives) for that keypress.\n"
+                    + "Disable this to mix players and battle NPCs normally.");
+            }
+
             ImGui.Text("\n[Debug Overlay]");
             var debugOverlayEnabled = Configuration.DebugOverlayEnabled;
             if (ImGui.Checkbox("Draw targeting geometry##DebugOverlay", ref debugOverlayEnabled))
@@ -376,6 +391,7 @@ namespace BetterTargetingSystem.Windows
                 Configuration.Cone3Distance = 40;
                 Configuration.CloseTargetsCircleEnabled = true;
                 Configuration.CloseTargetsCircleRadius = 5;
+                Configuration.PrioritizePlayersInPvP = true;
                 Configuration.DebugOverlayEnabled = false;
                 Configuration.Save();
             }

@@ -5,6 +5,8 @@
 Better Targeting System is a plugin that tries to improve the way Tab targeting works.  
 It uses cones of different sizes depending on distance to identify which targets can be acquired.
 
+In PvP, the default **Prefer enemy players over battle NPCs** setting keeps targetable, visible hostile players ahead of battle-NPC targets such as Frontlines nodes. Battle NPCs remain available when no hostile player is eligible, or when the preference is disabled.
+
 Here's what it does when you press the `Cycle Targets` keybind:
 
 - It first tries to target an enemy in front of your character in the direction your camera is facing (as explained above).

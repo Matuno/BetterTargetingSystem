@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <Compile Include="..\BetterTargetingSystem\TargetingMath.cs" Link="TargetingMath.cs" />
+    <Compile Include="..\BetterTargetingSystem\TargetSelectionPolicy.cs" Link="TargetSelectionPolicy.cs" />
   </ItemGroup>
 
   <ItemGroup>

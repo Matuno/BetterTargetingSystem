@@ -190,7 +190,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         if (ObjectTable.LocalPlayer == null)
             return;
 
-        var (Targets, CloseTargets, EnemyListTargets, OnScreenTargets) = GetTargets();
+        var (Targets, CloseTargets, EnemyListTargets, OnScreenTargets) = ApplyPvpPlayerPreference(GetTargets());
 
         // All objects in Targets and CloseTargets are in OnScreenTargets so it's not necessary to test them
         if (EnemyListTargets.Count == 0 && OnScreenTargets.Count == 0)
@@ -253,6 +253,16 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
         var _targets = AOETargetsList.Where(o => OnScreenTargets.Contains(o.obj)).ToList();
 
+        var visiblePlayerCount = _targets.Count(o => o.obj.ObjectKind == ObjectKind.Pc);
+        if (TargetSelectionPolicy.ShouldPreferVisiblePlayers(
+                Client.IsPvP,
+                Configuration.PrioritizePlayersInPvP,
+                visiblePlayerCount))
+        {
+            _targets = _targets.Where(o => o.obj.ObjectKind == ObjectKind.Pc).ToList();
+            Log($"PvP player priority kept {visiblePlayerCount} best-AOE player target(s).");
+        }
+
         if (_targets.Count == 0)
             return;
         Log("BestAoE: More than 0 targets");
@@ -269,7 +279,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
             return;
         }
 
-        var (Targets, CloseTargets, EnemyListTargets, OnScreenTargets) = GetTargets();
+        var (Targets, CloseTargets, EnemyListTargets, OnScreenTargets) = ApplyPvpPlayerPreference(GetTargets());
 
         // All objects in Targets and CloseTargets are in OnScreenTargets so it's not necessary to test them
         if (EnemyListTargets.Count == 0 && OnScreenTargets.Count == 0)
@@ -373,6 +383,33 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
     public record ObjectsList(List<DalamudGameObject> Targets, List<DalamudGameObject> CloseTargets, List<DalamudGameObject> TargetsEnemy, List<DalamudGameObject> OnScreenTargets);
 
+    private ObjectsList ApplyPvpPlayerPreference(ObjectsList targets)
+    {
+        var visiblePlayerTargets = targets.OnScreenTargets
+            .Where(o => o.ObjectKind == ObjectKind.Pc)
+            .ToList();
+        var playerPreferenceActive = TargetSelectionPolicy.ShouldPreferVisiblePlayers(
+            Client.IsPvP,
+            Configuration.PrioritizePlayersInPvP,
+            visiblePlayerTargets.Count);
+        if (!playerPreferenceActive)
+            return targets;
+
+        var visiblePlayerIds = visiblePlayerTargets.Select(o => o.EntityId).ToHashSet();
+        Log($"PvP player priority kept {visiblePlayerTargets.Count} visible player target(s).");
+        return new ObjectsList(
+            targets.Targets.Where(o => TargetSelectionPolicy.ShouldKeepAfterPlayerPreference(
+                playerPreferenceActive,
+                visiblePlayerIds.Contains(o.EntityId))).ToList(),
+            targets.CloseTargets.Where(o => TargetSelectionPolicy.ShouldKeepAfterPlayerPreference(
+                playerPreferenceActive,
+                visiblePlayerIds.Contains(o.EntityId))).ToList(),
+            targets.TargetsEnemy.Where(o => TargetSelectionPolicy.ShouldKeepAfterPlayerPreference(
+                playerPreferenceActive,
+                visiblePlayerIds.Contains(o.EntityId))).ToList(),
+            visiblePlayerTargets);
+    }
+
     [MethodImpl(MethodImplOptions.NoOptimization | MethodImplOptions.NoInlining)]
     internal ObjectsList GetTargets()
     {
@@ -407,11 +444,12 @@ public sealed unsafe class Plugin : IDalamudPlugin
             o != ObjectTable.LocalPlayer
             && (ObjectKind.BattleNpc.Equals(o.ObjectKind) && Utils.CanAttack(o)
                 || ObjectKind.Pc.Equals(o.ObjectKind)
-                && o is DalamudCharacter character
-                && (character.StatusFlags & StatusFlags.Hostile) != 0))
+                && Utils.IsHostilePlayer(o)))
             .ToList();
 
-        Log($"{PotentialTargets.Count()} potential target(s) found.");
+        var potentialPlayerCount = PotentialTargets.Count(o => o.ObjectKind == ObjectKind.Pc);
+        Log($"{PotentialTargets.Count} potential target(s) found "
+            + $"({potentialPlayerCount} player(s), {PotentialTargets.Count - potentialPlayerCount} battle NPC(s)).");
 
         var EnemyList = Utils.GetEnemyListObjectIds();
 
@@ -419,10 +457,6 @@ public sealed unsafe class Plugin : IDalamudPlugin
         foreach (var obj in PotentialTargets)
         {
             Log($"Processing target {++targetIndex}/{PotentialTargets.Count}");
-            // In the enemy list addon, adding it to the Enemy list
-            if (EnemyList.Contains(obj.EntityId))
-                TargetsEnemyList.Add(obj);
-
             var o = (GameObject*)obj.Address;
             if (o == null)
             {
@@ -443,6 +477,10 @@ public sealed unsafe class Plugin : IDalamudPlugin
                 Log("Can't target this object because it belongs to another player, skipping.");
                 continue;
             }
+
+            // Keep targetable enemy-list entries as a fallback even when they are off screen.
+            if (EnemyList.Contains(obj.EntityId))
+                TargetsEnemyList.Add(obj);
 
             var distance = Utils.DistanceBetweenObjects(ObjectTable.LocalPlayer!, obj);
 

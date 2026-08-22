@@ -11,13 +11,13 @@
 - `IFramework.Update` polls configured keyboard and mouse bindings while the client is logged in.
 - `/bts`, Dalamud's configuration UI action, and the plugin-manager action open the configuration window.
 - `/btshelp` and Dalamud's main UI action open the help window.
-- Configuration controls define three cone widths and ranges, a close-target circle, an opt-in diagnostic geometry overlay, and bindings for cycle, closest, lowest-health, and best-AOE selection.
-- Target selection reads the local player, object table, hostile status, enemy-list UI state, targetability, screen visibility, line of sight, distance, health, camera orientation, and current/previous target.
+- Configuration controls define three cone widths and ranges, a close-target circle, a default-on PvP player preference, an opt-in diagnostic geometry overlay, and bindings for cycle, closest, lowest-health, and best-AOE selection.
+- Target selection reads the local player, object table, hostile/action-target relation, enemy-list UI state, targetability, screen visibility, line of sight, distance, health, camera orientation, and current/previous target.
 
 ## Outputs and persistence
 
 - An explicit configured keypress may set `ITargetManager.Target`, clear `ITargetManager.SoftTarget`, and consume the matching `IKeyState` entry so the game's default binding does not also run.
-- Cone/circle settings, keybinds, and the default-off debug-overlay toggle are persisted through `IDalamudPluginInterface.SavePluginConfig`.
+- Cone/circle settings, keybinds, the default-on PvP player preference, and the default-off debug-overlay toggle are persisted through `IDalamudPluginInterface.SavePluginConfig`.
 - When enabled, the overlay draws the configured effective distance-band outlines, camera-forward axis, and close-target circle. It does not enumerate, classify, or highlight targets.
 - Cycling entity IDs are retained only in memory and cleared on territory change or unload.
 - The plugin writes no files other than Dalamud-managed configuration and exports no game state.
@@ -25,14 +25,14 @@
 ## Client-state and unload behavior
 
 - Targeting is inactive while logged out, without a local player, in GPose, or while text input/ImGui keyboard capture is active. Dalamud's UI-hide callback clears the managed ImGui-capture handoff so hidden UI cannot leave key handling blocked.
-- PvP is intentionally supported for locally hostile player characters; friendly and non-hostile player characters are excluded.
+- PvP is intentionally supported for player characters that the game's action-target classifier identifies as enemies; friendly, allied, and unknown player relations are excluded. By default, an eligible visible enemy player is preferred over battle-NPC targets (including objectives), with battle NPCs retained as a fallback or when the preference is disabled.
 - Territory changes clear target-cycle state and any captured debug geometry. The opt-in overlay remains available in combat, duties, flight, and PvP so it can diagnose the states where targeting runs; it clears while logged out, in GPose, disabled, or when required player/camera/projection state is unavailable.
 - Checked player, camera, graphics-device, UI-array, native-object, and collision paths reject the candidate or operation when required state is unavailable. Zoning/reload behavior remains a mandatory live check before promotion.
 - Unload unregisters framework and territory callbacks, all four UI callbacks, commands, and windows. No background worker, hook, socket, or retained native pointer exists.
 
 ## Privacy and retention
 
-- The plugin observes transient object kinds, hostile/combat flags, positions, hitbox sizes, health, entity IDs, targetability, and camera/collision state solely for local target selection.
+- The plugin observes transient object kinds, hostile/combat flags, action-target relation, positions, hitbox sizes, health, entity IDs, targetability, and camera/collision state solely for local target selection.
 - It does not retain or export character names, content IDs, account identifiers, world positions, or object snapshots. While the overlay is enabled, it retains only the latest pointer-free array of projected two-dimensional line endpoints until replacement, disablement, territory change, or unload.
 - Debug logging contains operational counts and decisions but must not include full character identity, IDs, addresses, or coordinates.
 
@@ -51,13 +51,13 @@
 - `Camera.WorldToScreenPoint` and `Device.Width`/`Device.Height` provide the existing strict viewport bounds check in addition to public `IGameGui.WorldToScreen`; singleton paths and positive device dimensions are checked. Debug projection also checks `Control.Instance` and `Device.Instance` before calling the public projection service because its current implementation reads their view-projection/device state internally.
 - `GameObject.GetIsTargetable`, `EventId.ContentId`/`Id`, and `Position` support targetability, leve/treasure ownership, and line of sight where public object interfaces are insufficient.
 - Enemy-list lookup uses `AtkStage.GetNumberArrayData(NumberArrayType.EnemyList)` and the typed `EnemyListNumberArray.EnemyCount`/`Enemies`/`EntityId` layout, clamping the count to its fixed eight entries. `RaptureAtkModule.AtkModule.IsTextInputActive` and `Framework.CursorInputs.MouseButtonPressedFlags` supply text/mouse state not otherwise exposed by the existing keybind implementation; unavailable text-input state blocks key handling.
-- `ActionManager.CanUseActionOnTarget` uses action ID 142 only to filter battle NPCs; hostile player characters use public `ICharacter.StatusFlags.Hostile` instead. These native reads are not retained between calls.
+- `ActionManager.CanUseActionOnTarget` uses action ID 142 only to filter battle NPCs. In PvP, `ActionManager.ClassifyTarget(Character*) == TargetCategory.Enemy` supplies the game's action-independent enemy relation for player characters because public `ICharacter.StatusFlags.Hostile` did not reliably identify Frontlines opponents; outside PvP the public hostile flag remains the player predicate. Native pointers and classifier results are not retained between calls.
 - `user32!GetKeyboardState` reads configured desktop key state. Public `ITargetManager` and `IKeyState` setters are the only client-state mutations and run only in response to the user's configured keypress.
 - Registry risk flags therefore record ClientStructs and client/input mutation use, with no hooks or network dependency.
 
 ## Verification plan
 
-- `BetterTargetingSystem.Tests` deterministically validates ViewMatrix forward extraction, camera-translation independence, debug yaw, player-origin cone boundaries, overlay endpoint geometry, elevation independence, full-circle behavior, and fail-closed invalid inputs.
+- `BetterTargetingSystem.Tests` deterministically validates ViewMatrix forward extraction, camera-translation independence, debug yaw, player-origin cone boundaries, overlay endpoint geometry, elevation independence, full-circle behavior, fail-closed invalid inputs, PvP relation selection, and player-preference gating.
 - Restore in locked mode, build Debug and Release for x64 against the current release and staging distributions, run tests, inspect the release package, and run `git diff --check`.
 - A future enumerated read-only IPC test must confirm the loaded DLL hash and bounded adapter/invariant state without setting targets or consuming keys; the registry keeps live tests disabled until that provider exists.
 - Target selection, key consumption, plugin reload/unload, and PvP behavior require personal live validation plus targeted Dalamud log inspection; they are intentionally outside the read-only IPC contract.
