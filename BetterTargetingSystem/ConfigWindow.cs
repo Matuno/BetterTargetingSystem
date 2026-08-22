@@ -10,7 +10,6 @@ namespace BetterTargetingSystem.Windows
 {
     public class ConfigWindow : Window, IDisposable
     {
-        private readonly Plugin Plugin;
         private Configuration Configuration;
         public Keybind CurrentKeys { get; private set; }
 
@@ -26,7 +25,6 @@ namespace BetterTargetingSystem.Windows
             this.Size = new Vector2(185, 270);
             this.SizeCondition = ImGuiCond.Appearing;
 
-            this.Plugin = plugin;
             this.Configuration = plugin.Configuration;
 
             this.CurrentKeys = new Keybind();
@@ -344,6 +342,27 @@ namespace BetterTargetingSystem.Windows
                 }
                 ImGui.EndTable();
             }
+
+            ImGui.Text("\n[Debug Overlay]");
+            var debugOverlayEnabled = Configuration.DebugOverlayEnabled;
+            if (ImGui.Checkbox("Draw targeting geometry##DebugOverlay", ref debugOverlayEnabled))
+            {
+                Configuration.DebugOverlayEnabled = debugOverlayEnabled;
+                Configuration.Save();
+            }
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(
+                    "Draws nominal configured ranges from the player.\n"
+                    + "Actual target eligibility also accounts for hitbox radius.\n"
+                    + "Diagnostic overlay; may affect performance.");
+            }
+            ImGui.TextColored(new Vector4(0.1f, 0.9f, 1f, 1f), "Cyan: camera direction");
+            ImGui.TextColored(new Vector4(1f, 0.25f, 0.25f, 1f), "Red: cone 1");
+            ImGui.TextColored(new Vector4(1f, 0.65f, 0.1f, 1f), "Orange: cone 2");
+            ImGui.TextColored(new Vector4(1f, 1f, 0.2f, 1f), "Yellow: cone 3");
+            ImGui.TextColored(new Vector4(0.2f, 0.6f, 1f, 1f), "Blue: close-target circle");
+
             ImGui.NewLine();
             if (ImGui.Button("Reset settings to defaults", new Vector2(170,25)))
             {
@@ -357,10 +376,9 @@ namespace BetterTargetingSystem.Windows
                 Configuration.Cone3Distance = 40;
                 Configuration.CloseTargetsCircleEnabled = true;
                 Configuration.CloseTargetsCircleRadius = 5;
+                Configuration.DebugOverlayEnabled = false;
                 Configuration.Save();
             }
-
-            Plugin.DebugMode.Draw();
         }
 
         private void UnfocusInput()

@@ -21,6 +21,7 @@ public class Configuration : IPluginConfiguration
     public float Cone3Distance { get; set; } = 40;
     public bool CloseTargetsCircleEnabled { get; set; } = true;
     public float CloseTargetsCircleRadius { get; set; } = 5;
+    public bool DebugOverlayEnabled { get; set; } = false;
 
     public Keybind TabTargetKeybind { get; set; } = new Keybind(VirtualKey.TAB, false, false, false);
     public Keybind ClosestTargetKeybind { get; set; } = new Keybind(VirtualKey.TAB, false, true, false);

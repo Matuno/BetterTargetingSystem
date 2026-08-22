@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Authors>Lysneth, maintained by Khayle</Authors>
+    <Authors>Lynesth, Khayle, and Matuno</Authors>
     <Company></Company>
     <Version>0.15.3</Version>
     <Description>Better Targeting System</Description>
     <Copyright></Copyright>
-    <PackageProjectUrl>https://github.com/Lynesth/BetterTargetingSystem</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/Matuno/BetterTargetingSystem</PackageProjectUrl>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -25,14 +26,5 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-
-  <PropertyGroup>
-    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
-  </PropertyGroup>
-  
-   <PropertyGroup Condition="'$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))'">
-    <DalamudLibPath>$(DALAMUD_HOME)/</DalamudLibPath>
-  </PropertyGroup>
-
 
 </Project>

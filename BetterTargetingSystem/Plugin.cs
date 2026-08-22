@@ -4,22 +4,20 @@ using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
-using Dalamud.Utility.Signatures;
 using FFXIVClientStructs.FFXIV.Client.Game.Event;
-using FFXIVClientStructs.FFXIV.Client.Game.Group;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
 using BetterTargetingSystem.Windows;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 using Dalamud.Plugin.Services;
 
 using DalamudCharacter = Dalamud.Game.ClientState.Objects.Types.ICharacter;
 using DalamudGameObject = Dalamud.Game.ClientState.Objects.Types.IGameObject;
 using ObjectKind = Dalamud.Game.ClientState.Objects.Enums.ObjectKind;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
-using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using Dalamud.Bindings.ImGui;
 
 namespace BetterTargetingSystem;
@@ -30,7 +28,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
     public string CommandConfig => "/bts";
     public string CommandHelp => "/btshelp";
 
-    internal IEnumerable<uint> LastConeTargets { get; private set; } = Enumerable.Empty<uint>();
+    internal IReadOnlyList<uint> LastConeTargets { get; private set; } = Array.Empty<uint>();
     internal List<uint> CyclingTargets { get; private set; } = new List<uint>();
     internal DebugMode DebugMode { get; private set; }
 
@@ -44,13 +42,12 @@ public sealed unsafe class Plugin : IDalamudPlugin
     [PluginService] public static IObjectTable ObjectTable { get; set; } = null!;
     [PluginService] public static ITargetManager TargetManager { get; set; } = null!;
     [PluginService] public static IGameGui GameGui { get; set; } = null!;
-    [PluginService] public static IGameInteropProvider GameInteropProvider { get; set; } = null!;
     [PluginService] public static IKeyState KeyState { get; set; } = null!;
-    [PluginService] public static ICondition Condition { get; set; } = null!;
 
     private ConfigWindow ConfigWindow { get; init; }
     private HelpWindow HelpWindow { get; init; }
     private WindowSystem WindowSystem = new("BetterTargetingSystem");
+    private bool uiWantsKeyboard;
 
     // Shamelessly stolen, not sure what that game function exactly does but it works
     //[Signature("48 89 5C 24 ?? 57 48 83 EC 20 48 8B DA 8B F9 E8 ?? ?? ?? ?? 4C 8B C3")]
@@ -59,22 +56,19 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
     public Plugin()
     {
-        GameInteropProvider.InitializeFromAttributes(this);
-
-
         this.Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         this.Configuration.Initialize(PluginInterface);
-
-        Framework.Update += Update;
-        Client.TerritoryChanged += ClearLists;
 
         ConfigWindow = new ConfigWindow(this);
         WindowSystem.AddWindow(ConfigWindow);
         HelpWindow = new HelpWindow(this);
         WindowSystem.AddWindow(HelpWindow);
-
         this.DebugMode = new DebugMode(this);
+
+        Framework.Update += Update;
+        Client.TerritoryChanged += ClearLists;
         PluginInterface.UiBuilder.Draw += DrawUI;
+        PluginInterface.UiBuilder.HideUi += ClearUiKeyboardCapture;
         PluginInterface.UiBuilder.OpenMainUi += DrawHelpUI;
         PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
 
@@ -88,15 +82,36 @@ public sealed unsafe class Plugin : IDalamudPlugin
     {
         Framework.Update -= Update;
         Client.TerritoryChanged -= ClearLists;
+        PluginInterface.UiBuilder.Draw -= DrawUI;
+        PluginInterface.UiBuilder.HideUi -= ClearUiKeyboardCapture;
+        PluginInterface.UiBuilder.OpenMainUi -= DrawHelpUI;
+        PluginInterface.UiBuilder.OpenConfigUi -= DrawConfigUI;
         CommandManager.RemoveHandler(CommandConfig);
         CommandManager.RemoveHandler(CommandHelp);
+        this.DebugMode.Clear();
+        this.LastConeTargets = Array.Empty<uint>();
+        this.CyclingTargets.Clear();
         this.WindowSystem.RemoveAllWindows();
         ConfigWindow.Dispose();
         HelpWindow.Dispose();
     }
 
     public static void Log(string message) => PluginLog.Debug(message);
-    private void DrawUI() => this.WindowSystem.Draw();
+    private void DrawUI()
+    {
+        try
+        {
+            Volatile.Write(ref this.uiWantsKeyboard, ImGui.GetIO().WantCaptureKeyboard);
+            this.WindowSystem.Draw();
+            this.DebugMode.Draw();
+        }
+        catch
+        {
+            ClearUiKeyboardCapture();
+            throw;
+        }
+    }
+    private void ClearUiKeyboardCapture() => Volatile.Write(ref this.uiWantsKeyboard, false);
     private void DrawHelpUI() => HelpWindow.Toggle();
     private void DrawConfigUI() => ConfigWindow.Toggle();
     private void ShowHelpWindow(string command, string args) => this.DrawHelpUI();
@@ -105,12 +120,15 @@ public sealed unsafe class Plugin : IDalamudPlugin
     public void ClearLists(uint territoryType)
     {
         // Attempt to fix a very rare bug I can't reproduce
-        this.LastConeTargets = new List<uint>();
+        this.DebugMode.Clear();
+        this.LastConeTargets = Array.Empty<uint>();
         this.CyclingTargets = new List<uint>();
     }
 
     public void Update(IFramework framework)
     {
+        this.DebugMode.CaptureSnapshot();
+
         if (Client.IsLoggedIn == false || ObjectTable.LocalPlayer == null)
             return;
 
@@ -118,8 +136,10 @@ public sealed unsafe class Plugin : IDalamudPlugin
         if (Client.IsGPosing)
             return;
 
-        // Disable if keyboard is being used to type text
-        if (Utils.IsTextInputActive || ImGui.GetIO().WantCaptureKeyboard)
+        // Disable if keyboard is being used to type text, or if native input state is unavailable.
+        if (!Utils.TryGetTextInputActive(out var isTextInputActive)
+            || isTextInputActive
+            || Volatile.Read(ref this.uiWantsKeyboard))
             return;
 
         Keybinds.Keybind.GetKeyboardState();
@@ -207,15 +227,9 @@ public sealed unsafe class Plugin : IDalamudPlugin
             return;
         }
 
-        var groupManager = GroupManager.Instance();
-        if (groupManager != null)
-        {
-            EnemyListTargets.AddRange(OnScreenTargets.Where(o =>
-                EnemyListTargets.Contains(o) == false
-                && ((o as DalamudCharacter)?.StatusFlags & StatusFlags.InCombat) != 0
-            //&& groupManager->MainGroup.GetPartyMemberByEntityId((uint)o.TargetObjectId) != null
-            ));
-        }
+        EnemyListTargets.AddRange(OnScreenTargets.Where(o =>
+            EnemyListTargets.Contains(o) == false
+            && ((o as DalamudCharacter)?.StatusFlags & StatusFlags.InCombat) != 0));
 
         if (EnemyListTargets.Count == 0)
         {
@@ -273,7 +287,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
         {
             Targets = Targets.OrderBy(o => Utils.DistanceBetweenObjects(ObjectTable.LocalPlayer, o)).ToList();
 
-            var TargetsObjectIds = Targets.Select(o => o.EntityId);
+            var TargetsObjectIds = Targets.Select(o => o.EntityId).ToArray();
             // Same cone targets as last cycle
             if (this.LastConeTargets.ToHashSet().SetEquals(TargetsObjectIds.ToHashSet()))
             {
@@ -307,7 +321,7 @@ public sealed unsafe class Plugin : IDalamudPlugin
             return;
         }
 
-        this.LastConeTargets = Enumerable.Empty<uint>();
+        this.LastConeTargets = Array.Empty<uint>();
 
         if (CloseTargets.Count > 0)
         {
@@ -379,6 +393,13 @@ public sealed unsafe class Plugin : IDalamudPlugin
 
         // There might be a way to store this and just update the values if they actually change
         var device = Device.Instance();
+        if (device == null || device->Width == 0 || device->Height == 0)
+            return new ObjectsList(TargetsList, CloseTargetsList, TargetsEnemyList, OnScreenTargetsList);
+
+        var cameraManager = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.CameraManager.Instance();
+        if (cameraManager == null || cameraManager->CurrentCamera == null)
+            return new ObjectsList(TargetsList, CloseTargetsList, TargetsEnemyList, OnScreenTargetsList);
+
         float deviceWidth = device->Width;
         float deviceHeight = device->Height;
 

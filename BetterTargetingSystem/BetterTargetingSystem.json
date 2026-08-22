@@ -1,13 +1,11 @@
 {
-    "Author": "Lynesth, maintained by Khayle",
+    "Author": "Lynesth, Khayle, and Matuno",
     "Name": "Better Targeting System",
     "Punchline": "A more intelligent targeting system for the game.",
     "Description": "A more intelligent targeting system for the game which also includes new keybinds.",
-    "InternalName": "BetterTargetingSystem",
     "ApplicableVersion": "any",
-    "DalamudApiLevel": 15,
-    "RepoUrl": "https://github.com/Lynesth/BetterTargetingSystem",
-    "IconUrl": "https://github.com/Lynesth/BetterTargetingSystem/raw/main/BetterTargetingSystem/images/icon.png",
+    "RepoUrl": "https://github.com/Matuno/BetterTargetingSystem",
+    "IconUrl": "https://github.com/Matuno/BetterTargetingSystem/raw/main/BetterTargetingSystem/images/icon.png",
     "Tags": [
         "Tab",
         "Target",

@@ -1,5 +1,7 @@
 # Better Targeting System
 
+> This fork enables targeting hostile players in PvP and is intended for private or custom-repository use. It is not eligible for the official Dalamud plugin repository.
+
 Better Targeting System is a plugin that tries to improve the way Tab targeting works.  
 It uses cones of different sizes depending on distance to identify which targets can be acquired.
 
@@ -14,6 +16,8 @@ The plugin will not target enemies you cannot interact with, such as those in an
 
 It also adds an extra keybind to target the lowest (absolute) health enemy as well as a keybind to target the "best" enemy for targeted aoes.
 You can use /bts to configure the keybinds used by this plugin as well as the angles and ranges of the cones and circle used to cycle between targets.
+
+For camera/alignment troubleshooting, the Settings tab has a default-off **Draw targeting geometry** toggle. It draws the effective player-origin cone distance bands, camera-forward axis, and close-target circle without scanning or highlighting individual targets.
 
 Do not hesitate to give feedback/suggestion and submit bug reports on the Github repository.
 
